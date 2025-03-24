@@ -1,4 +1,4 @@
-// ----- Helper Functions -----
+// ------------------ Helper Functions ------------------
 
 // Log queries to localStorage
 function logQuery(query, success) {
@@ -11,7 +11,7 @@ function logQuery(query, success) {
 function parseInput(input) {
   input = input.trim();
   if (input.includes("roblox.com")) {
-    // Attempt to extract the numeric ID from a profile URL
+    // Attempt to extract numeric ID from a profile URL
     const regex = /\/users\/(\d+)/;
     const match = input.match(regex);
     if (match && match[1]) {
@@ -28,6 +28,7 @@ function parseInput(input) {
 // Fetch profile data by user ID using the Roblox Users API
 async function fetchProfileById(userId) {
   const url = `https://users.roblox.com/v1/users/${userId}`;
+  console.log("Fetching profile by ID:", url);
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error("User not found or API error (ID lookup).");
@@ -38,6 +39,7 @@ async function fetchProfileById(userId) {
 // Fetch profile data by username using the legacy GET endpoint
 async function fetchProfileByUsername(username) {
   const url = `https://api.roblox.com/users/get-by-username?username=${encodeURIComponent(username)}`;
+  console.log("Fetching profile by username:", url);
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error("Username lookup failed (network error).");
@@ -46,17 +48,18 @@ async function fetchProfileByUsername(username) {
   if (data.Id === 0) {
     throw new Error("No user found for that username.");
   }
-  // Map to a similar object structure as the ID lookup
+  // Map to an object similar to the ID lookup response
   return {
     id: data.Id,
     name: data.Username,
-    displayName: data.Username // The legacy endpoint does not provide a separate display name.
+    displayName: data.Username // Note: Legacy endpoint doesn't provide a separate display name.
   };
 }
 
 // Fetch the user's profile thumbnail image
 async function fetchThumbnail(userId) {
   const url = `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`;
+  console.log("Fetching thumbnail:", url);
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error("Failed to fetch profile picture.");
@@ -68,17 +71,22 @@ async function fetchThumbnail(userId) {
   return "placeholder.png";
 }
 
-// ----- Main Execution -----
+// ------------------ Main Execution ------------------
 document.addEventListener("DOMContentLoaded", function () {
-  // ----- On index.html: Handle Search Form Submission -----
+  console.log("DOM fully loaded.");
+
+  // -------------- For index.html (Search Page) --------------
   const searchForm = document.getElementById("searchForm");
   if (searchForm) {
     searchForm.addEventListener("submit", function (e) {
       e.preventDefault();
+      console.log("Search form submitted.");
+
       const inputField = document.getElementById("robloxInput");
       const errorDiv = document.getElementById("error");
       errorDiv.textContent = "";
       const input = inputField.value;
+      console.log("User input:", input);
 
       if (!input) {
         errorDiv.textContent = "Please enter a Roblox ID, username, or profile URL.";
@@ -88,20 +96,24 @@ document.addEventListener("DOMContentLoaded", function () {
       let parsed;
       try {
         parsed = parseInput(input);
+        console.log("Parsed input:", parsed);
       } catch (err) {
         errorDiv.textContent = "Error parsing input: " + err.message;
+        console.error("Parsing error:", err);
         return;
       }
 
-      // Log the query as pending (false)
+      // Log the query (pending success)
       logQuery(input, false);
-      // Redirect to the results page with the query in the URL
+      // Debug: Log the redirection step.
+      console.log("Redirecting to results page with query:", input);
+      // Redirect to results.html with the query as a URL parameter.
       window.location.href = `results.html?query=${encodeURIComponent(input)}`;
     });
   }
 
-  // ----- On results.html: Fetch and Display Profile Data -----
-  if (window.location.pathname.includes("results.html")) {
+  // -------------- For results.html (Profile Display Page) --------------
+  if (window.location.pathname.indexOf("results.html") !== -1) {
     const params = new URLSearchParams(window.location.search);
     const query = params.get("query");
     const errorDiv = document.getElementById("error");
@@ -115,12 +127,14 @@ document.addEventListener("DOMContentLoaded", function () {
     let parsed;
     try {
       parsed = parseInput(query);
+      console.log("Results page - parsed query:", parsed);
     } catch (err) {
       errorDiv.textContent = "Error parsing query: " + err.message;
+      console.error("Parsing error on results page:", err);
       return;
     }
 
-    // Provide loading feedback
+    // Show a loading message
     errorDiv.textContent = "Loading profile...";
     profileCard.style.display = "none";
 
@@ -132,11 +146,13 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
           profileData = await fetchProfileByUsername(parsed.value);
         }
-        // Log the query as successful
+        console.log("Fetched profile data:", profileData);
+        // Log successful query
         logQuery(query, true);
       } catch (err) {
         console.error("Error fetching profile data:", err);
         errorDiv.textContent = "Error fetching profile: " + err.message;
+        alert("Error: " + err.message);
         return;
       }
 
@@ -155,13 +171,15 @@ document.addEventListener("DOMContentLoaded", function () {
       document.getElementById("username").textContent = "Username: " + profileData.name;
       document.getElementById("robloxId").textContent = "User ID: " + profileData.id;
 
-      errorDiv.textContent = ""; // Clear any error/loading message
-      profileCard.style.display = "block"; // Show the profile card
+      // Clear loading message and show profile
+      errorDiv.textContent = "";
+      profileCard.style.display = "block";
+      console.log("Profile displayed successfully.");
     })();
   }
 
-  // ----- On logs.html: Display the Query Logs -----
-  if (window.location.pathname.includes("logs.html")) {
+  // -------------- For logs.html (Query Logs Page) --------------
+  if (window.location.pathname.indexOf("logs.html") !== -1) {
     const logsContainer = document.getElementById("logsContainer");
     const logs = JSON.parse(localStorage.getItem("queryLogs")) || [];
 
