@@ -22,7 +22,7 @@ function parseInput(input) {
   return { type: "username", value: input };
 }
 
-// Fetch profile data using Roblox API by user ID
+// Fetch profile data using Roblox API by user ID (GET)
 async function fetchProfileById(userId) {
   const url = `https://users.roblox.com/v1/users/${userId}`;
   const response = await fetch(url);
@@ -32,22 +32,23 @@ async function fetchProfileById(userId) {
   return await response.json();
 }
 
-// Fetch profile data by username using Roblox API (POST)
+// Revised: Fetch profile data by username using the legacy GET endpoint
 async function fetchProfileByUsername(username) {
-  const url = "https://users.roblox.com/v1/usernames/users";
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ usernames: [username], excludeBannedUsers: false })
-  });
+  const url = `https://api.roblox.com/users/get-by-username?username=${encodeURIComponent(username)}`;
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error("Username lookup failed.");
   }
   const data = await response.json();
-  if (data.data.length === 0) {
+  if (data.Id === 0) {
     throw new Error("No user found for that username.");
   }
-  return data.data[0];
+  // For consistency, return an object similar to the fetchProfileById result
+  return {
+    id: data.Id,
+    name: data.Username,
+    displayName: data.Username  // The legacy endpoint doesn't provide a separate display name.
+  };
 }
 
 // Fetch thumbnail image for the user using Roblox Thumbnail API
