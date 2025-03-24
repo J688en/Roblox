@@ -1,0 +1,67 @@
+/* style.css */
+
+body {
+  background: linear-gradient(135deg, #74ABE2, #5563DE);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #333;
+  min-height: 100vh;
+}
+
+/* Container styling */
+.container {
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+}
+
+/* Header styling */
+header h1 {
+  color: #fff;
+  font-weight: bold;
+}
+
+/* Search form styling */
+.search-section form {
+  background: #fff;
+  border-radius: 10px;
+  padding: 2rem;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+/* Card styling for profile details */
+.card {
+  margin-bottom: 1rem;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Profile image */
+.card-img-top {
+  width: 100%;
+  object-fit: cover;
+}
+
+/* Footer links styling */
+footer a {
+  color: #fff;
+  text-decoration: underline;
+}
+
+/* Table styling for logs */
+table {
+  background: #fff;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Button styles */
+.btn-primary,
+.btn-secondary,
+.btn-info {
+  border-radius: 25px;
+  padding: 0.5rem 1.5rem;
+}
+
+/* Add hover effects for links */
+a:hover {
+  text-decoration: none;
+}
