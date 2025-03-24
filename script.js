@@ -1,15 +1,17 @@
-// Save search query logs in localStorage
+// ----- Helper Functions -----
+
+// Log queries to localStorage
 function logQuery(query, success) {
   const logs = JSON.parse(localStorage.getItem("queryLogs")) || [];
   logs.push({ query, success, time: new Date().toLocaleString() });
   localStorage.setItem("queryLogs", JSON.stringify(logs));
 }
 
-// Parse user input to determine if it's an ID, username, or URL
+// Parse input to determine if it's an ID, username, or URL
 function parseInput(input) {
   input = input.trim();
   if (input.includes("roblox.com")) {
-    // Extract numeric ID from URL using regex
+    // Attempt to extract the numeric ID from a profile URL
     const regex = /\/users\/(\d+)/;
     const match = input.match(regex);
     if (match && match[1]) {
@@ -19,39 +21,40 @@ function parseInput(input) {
   if (/^\d+$/.test(input)) {
     return { type: "id", value: input };
   }
+  // Default to username if not numeric or URL-based
   return { type: "username", value: input };
 }
 
-// Fetch profile data using Roblox API by user ID (GET)
+// Fetch profile data by user ID using the Roblox Users API
 async function fetchProfileById(userId) {
   const url = `https://users.roblox.com/v1/users/${userId}`;
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error("User not found or API error.");
+    throw new Error("User not found or API error (ID lookup).");
   }
   return await response.json();
 }
 
-// Revised: Fetch profile data by username using the legacy GET endpoint
+// Fetch profile data by username using the legacy GET endpoint
 async function fetchProfileByUsername(username) {
   const url = `https://api.roblox.com/users/get-by-username?username=${encodeURIComponent(username)}`;
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error("Username lookup failed.");
+    throw new Error("Username lookup failed (network error).");
   }
   const data = await response.json();
   if (data.Id === 0) {
     throw new Error("No user found for that username.");
   }
-  // For consistency, return an object similar to the fetchProfileById result
+  // Map to a similar object structure as the ID lookup
   return {
     id: data.Id,
     name: data.Username,
-    displayName: data.Username  // The legacy endpoint doesn't provide a separate display name.
+    displayName: data.Username // The legacy endpoint does not provide a separate display name.
   };
 }
 
-// Fetch thumbnail image for the user using Roblox Thumbnail API
+// Fetch the user's profile thumbnail image
 async function fetchThumbnail(userId) {
   const url = `https://thumbnails.roblox.com/v1/users/avatar-headshot?userIds=${userId}&size=150x150&format=Png&isCircular=false`;
   const response = await fetch(url);
@@ -62,80 +65,111 @@ async function fetchThumbnail(userId) {
   if (data.data && data.data.length > 0) {
     return data.data[0].imageUrl;
   }
-  return "";
+  return "placeholder.png";
 }
 
-// Execute code based on the current page
-document.addEventListener("DOMContentLoaded", function() {
-  // On index.html: Handle search form submission
+// ----- Main Execution -----
+document.addEventListener("DOMContentLoaded", function () {
+  // ----- On index.html: Handle Search Form Submission -----
   const searchForm = document.getElementById("searchForm");
   if (searchForm) {
-    searchForm.addEventListener("submit", async function(e) {
+    searchForm.addEventListener("submit", function (e) {
       e.preventDefault();
       const inputField = document.getElementById("robloxInput");
       const errorDiv = document.getElementById("error");
       errorDiv.textContent = "";
       const input = inputField.value;
+
+      if (!input) {
+        errorDiv.textContent = "Please enter a Roblox ID, username, or profile URL.";
+        return;
+      }
+
       let parsed;
       try {
         parsed = parseInput(input);
       } catch (err) {
-        errorDiv.textContent = "Invalid input.";
+        errorDiv.textContent = "Error parsing input: " + err.message;
         return;
       }
-      // Log the query attempt (initially false)
+
+      // Log the query as pending (false)
       logQuery(input, false);
-      // Redirect to results page with the query as a URL parameter
+      // Redirect to the results page with the query in the URL
       window.location.href = `results.html?query=${encodeURIComponent(input)}`;
     });
   }
 
-  // On results.html: Fetch and display profile data
+  // ----- On results.html: Fetch and Display Profile Data -----
   if (window.location.pathname.includes("results.html")) {
     const params = new URLSearchParams(window.location.search);
     const query = params.get("query");
     const errorDiv = document.getElementById("error");
+    const profileCard = document.getElementById("profileCard");
+
     if (!query) {
-      errorDiv.textContent = "No query provided.";
+      errorDiv.textContent = "No query provided in the URL.";
       return;
     }
-    const parsed = parseInput(query);
-    let profileData;
+
+    let parsed;
     try {
-      if (parsed.type === "id") {
-        profileData = await fetchProfileById(parsed.value);
-      } else {
-        profileData = await fetchProfileByUsername(parsed.value);
+      parsed = parseInput(query);
+    } catch (err) {
+      errorDiv.textContent = "Error parsing query: " + err.message;
+      return;
+    }
+
+    // Provide loading feedback
+    errorDiv.textContent = "Loading profile...";
+    profileCard.style.display = "none";
+
+    (async function () {
+      let profileData;
+      try {
+        if (parsed.type === "id") {
+          profileData = await fetchProfileById(parsed.value);
+        } else {
+          profileData = await fetchProfileByUsername(parsed.value);
+        }
+        // Log the query as successful
+        logQuery(query, true);
+      } catch (err) {
+        console.error("Error fetching profile data:", err);
+        errorDiv.textContent = "Error fetching profile: " + err.message;
+        return;
       }
-      // Log successful query
-      logQuery(query, true);
-    } catch (err) {
-      errorDiv.textContent = err.message;
-      return;
-    }
-    // Get profile thumbnail
-    let thumbnail = "";
-    try {
-      thumbnail = await fetchThumbnail(profileData.id);
-    } catch (err) {
-      console.error("Error fetching thumbnail:", err);
-    }
-    // Populate UI with profile data
-    document.getElementById("profileImg").src = thumbnail || "placeholder.png";
-    document.getElementById("displayName").textContent = profileData.displayName || "No display name";
-    document.getElementById("username").textContent = "Username: " + profileData.name;
-    document.getElementById("robloxId").textContent = "User ID: " + profileData.id;
-    document.getElementById("profileCard").style.display = "block";
+
+      let thumbnail = "";
+      try {
+        thumbnail = await fetchThumbnail(profileData.id);
+      } catch (err) {
+        console.error("Error fetching thumbnail:", err);
+        thumbnail = "placeholder.png";
+      }
+
+      // Populate the DOM with the profile information
+      document.getElementById("profileImg").src = thumbnail;
+      document.getElementById("displayName").textContent =
+        profileData.displayName || "No display name available";
+      document.getElementById("username").textContent = "Username: " + profileData.name;
+      document.getElementById("robloxId").textContent = "User ID: " + profileData.id;
+
+      errorDiv.textContent = ""; // Clear any error/loading message
+      profileCard.style.display = "block"; // Show the profile card
+    })();
   }
 
-  // On logs.html: Display the query logs
+  // ----- On logs.html: Display the Query Logs -----
   if (window.location.pathname.includes("logs.html")) {
     const logsContainer = document.getElementById("logsContainer");
     const logs = JSON.parse(localStorage.getItem("queryLogs")) || [];
+
     if (logs.length === 0) {
       logsContainer.innerHTML = "<p>No logs available.</p>";
       return;
     }
+
     let html = `<table class="table table-bordered table-hover">
                   <thead class="table-dark">
                     <tr>
